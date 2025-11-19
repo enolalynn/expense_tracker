@@ -13,6 +13,8 @@ const {
   singleUserTransactions,
   getAllTransactions,
   dailyReport,
+  weeklyReport,
+  monthlyReport,
 } = require("../controllers/auth.controller.js");
 const { body, param } = require("express-validator");
 const { authMiddleware } = require("../middleware/auth.middleware.js");
@@ -61,5 +63,10 @@ authRouter.get(
 
 authRouter.get("/users/transactions", getAllTransactions);
 
-authRouter.get("/user/:date", authMiddleware, dailyReport);
+authRouter.get("/user/daily/:date", authMiddleware, dailyReport);
+
+authRouter.get("/user/weekly/:date", authMiddleware, weeklyReport);
+
+authRouter.get("/user/monthly/:date", authMiddleware, monthlyReport);
+
 module.exports = authRouter;

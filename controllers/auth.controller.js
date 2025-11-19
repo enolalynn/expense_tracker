@@ -428,6 +428,83 @@ const weeklyReport = async (req, res) => {
   try {
     const date = req.params.date;
     const user_id = req.user.userId;
+    const totals = await client.query(
+      `
+  SELECT  
+      SUM(CASE WHEN status = 'INCOME' THEN amount ELSE 0 END) AS total_income,
+      SUM(CASE WHEN status = 'EXPENSE' THEN amount ELSE 0 END) AS total_expense
+  FROM transactions
+  WHERE user_id = $1 
+`,
+      [user_id]
+    );
+    const totalIncome = totals.rows[0].total_income || 0;
+    const totalExpense = totals.rows[0].total_expense || 0;
+    const balance = totalIncome - totalExpense;
+
+    const weeklyReport = await client.query(
+      `SELECT * FROM transactions
+      WHERE user_id = $1
+      AND DATE_TRUNC('week', created_at) = DATE_TRUNC('week', $2::date)
+      ORDER BY created_at DESC `,
+      [user_id, date]
+    );
+
+    if (!weeklyReport.rows[0]) {
+      res
+        .status(404)
+        .json({ message: "No transaction history for that week!" });
+    }
+
+    const result = {
+      transactions: weeklyReport.rows,
+      totals: {
+        total_income: Number(totalIncome),
+        total_expense: Number(totalExpense),
+        balance: Number(balance),
+      },
+    };
+    res.json(result);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "internal server error!",
+    });
+  } finally {
+    await database.disconnectDatabase();
+  }
+};
+
+const monthlyReport = async (req, res) => {
+  const client = await database.connectDatabase();
+  try {
+    const user_id = req.user.userId;
+    const date = req.params.date;
+    const totals = await client.query(
+      `SELECT  
+      SUM(CASE WHEN status = 'INCOME' THEN amount ELSE 0 END) AS total_income,
+      SUM(CASE WHEN status = 'EXPENSE' THEN amount ELSE 0 END) AS total_expense
+  FROM transactions
+  WHERE user_id = $1 `,
+      [user_id]
+    );
+    const totalIncome = totals.rows[0].total_income || 0;
+    const totalExpense = totals.rows[0].total_expense || 0;
+    const balance = totalIncome - totalExpense;
+
+    const monthlyReport = await client.query(
+      `SELECT * FROM transactions WHERE user_id = $1 AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', $2::date) ORDER BY created_at DESC`,
+      [user_id, date]
+    );
+    const result = {
+      transations: monthlyReport.rows,
+      totals: {
+        total_income: Number(totalIncome),
+        total_expense: Number(totalExpense),
+        balance: balance,
+      },
+    };
+    res.json(result);
   } catch (err) {
     console.log(err);
     res.status(500).json({
@@ -450,4 +527,6 @@ module.exports = {
   singleUserTransactions,
   getAllTransactions,
   dailyReport,
+  weeklyReport,
+  monthlyReport,
 };
